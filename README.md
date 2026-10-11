@@ -92,6 +92,8 @@ When the adapter crashes or an other Code error happens, this error message that
 ## Changelog
 ### **WORK IN PROGRESS**
 * (arteck) add watchdog
+* (arteck) switch to jsonConfig
+* (arteck) Dependencies have been updated
 
 ### 3.4.0 (2023-11-25)
 * IMPORTANT: This version requires at least Node.js 16+

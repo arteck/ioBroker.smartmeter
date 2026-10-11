@@ -142,6 +142,9 @@
     "loglevel": "info",
     "enabled": true,
     "compact": true,
+    "adminUI": {
+      "config": "json"
+    },
     "connectionType": "local",
     "dataSource": "push",
     "tier": 2,
@@ -160,7 +163,7 @@
     },
     "dependencies": [
       {
-        "js-controller": ">=2.0.0"
+        "js-controller": ">=3.3.22"
       }
     ]
   },
@@ -169,6 +172,7 @@
     "transport": "SerialResponseTransport",
     "requestInterval": 300,
     "transportSerialPort": "",
+    "customSerialPort": "",
     "transportSerialBaudrate": "",
     "transportSerialDataBits": "",
     "transportSerialStopBits": "",
