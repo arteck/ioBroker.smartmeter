@@ -16,6 +16,7 @@ const utils = require('@iobroker/adapter-core'); // Get common adapter utils
 const SmartmeterObis = require('smartmeter-obis');
 let smTransport;
 let recoveryTimer = null;
+let startTimer = null;
 const { SerialPort } = require('serialport');
 
 const smValues = {};
@@ -182,6 +183,9 @@ function startAdapter(options) {
         stopInProgress = true;
         if (recoveryTimer) {
 clearTimeout(recoveryTimer);
+}
+        if (startTimer) {
+clearTimeout(startTimer);
 }
         setConnected(false);
         if (smTransport) {
@@ -372,8 +376,15 @@ smOptions.protocolD0SignOnMessage = adapter.config.protocolD0SignOnMessage;
 
     smTransport = SmartmeterObis.init(smOptions, storeObisData);
 
-    smTransport.process();
+    // Give a previous instance time to release the serial port to avoid mixed-up data
+    const startDelay = (adapter.config.transport === 'SerialRequestResponseTransport' || adapter.config.transport === 'SerialResponseTransport') ? 10000 : 0;
     armWatchdog();
+    startTimer = setTimeout(() => {
+        startTimer = null;
+        if (!stopInProgress) {
+smTransport.process();
+}
+    }, startDelay);
 }
 
 // The transport may hang after a broken message (e.g. serial port not reopened).
