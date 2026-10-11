@@ -17,6 +17,7 @@ const SmartmeterObis = require('smartmeter-obis');
 let smTransport;
 let startTimer = null;
 let hadError = false;
+const stateTypes = {};
 const { SerialPort } = require('serialport');
 
 const smValues = {};
@@ -384,6 +385,30 @@ smOptions.protocolD0SignOnMessage = adapter.config.protocolD0SignOnMessage;
     }, startDelay);
 }
 
+// Existing objects keep the type from their first creation; convert new values to it
+async function setTypedState(id, val) {
+    if (!(id in stateTypes)) {
+        const obj = await adapter.getObjectAsync(id);
+        stateTypes[id] = obj && obj.common ? obj.common.type : null;
+    }
+    const type = stateTypes[id];
+    if (val !== null && val !== undefined && type && typeof val !== type) {
+        if (type === 'string') {
+            val = String(val);
+        } else if (type === 'number') {
+            const num = Number(val);
+            if (val === '' || Number.isNaN(num)) {
+                adapter.log.warn(`Value "${val}" for ${id} is not a number, state is of type number`);
+                return;
+            }
+            val = num;
+        } else if (type === 'boolean') {
+            val = val === true || val === 'true' || Number(val) === 1;
+        }
+    }
+    await adapter.setStateAsync(id, {ack: true, val});
+}
+
 async function storeObisData(err, obisResult) {
     if (stopInProgress) {
 return;
@@ -499,11 +524,11 @@ return;
         if (!smValues[obisId] || smValues[obisId].valueToString() !== obisResult[obisId].valueToString()) {
             if (obisResult[obisId].getRawValue() !== undefined) {
                 adapter.log.debug(`Set State ${  ioChannelId  }.rawvalue = ${  obisResult[obisId].getRawValue()}`);
-                await adapter.setStateAsync(`${ioChannelId  }.rawvalue`, {ack: true, val: obisResult[obisId].getRawValue()});
+                await setTypedState(`${ioChannelId  }.rawvalue`, obisResult[obisId].getRawValue());
             }
 
             adapter.log.debug(`Set State ${  ioChannelId  }.value = ${  obisResult[obisId].getValue(0).value}`);
-            await adapter.setStateAsync(`${ioChannelId  }.value`, {ack: true, val: obisResult[obisId].getValue(0).value});
+            await setTypedState(`${ioChannelId  }.value`, obisResult[obisId].getValue(0).value);
 
             if (obisResult[obisId].getValueLength() > 1) {
                 for (i = 1; i < obisResult[obisId].getValueLength(); i++) {
@@ -511,7 +536,7 @@ return;
 return;
 }
                     adapter.log.debug(`Set State ${ ioChannelId  }.value${  i + 1  } = ${  obisResult[obisId].getValue(i).value}`);
-                    await adapter.setStateAsync(`${ioChannelId  }.value${  i + 1}`, {ack: true, val: obisResult[obisId].getValue(i).value});
+                    await setTypedState(`${ioChannelId  }.value${  i + 1}`, obisResult[obisId].getValue(i).value);
                 }
             }
             smValues[obisId] = obisResult[obisId];
