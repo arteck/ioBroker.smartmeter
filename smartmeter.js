@@ -377,15 +377,18 @@ smOptions.protocolD0SignOnMessage = adapter.config.protocolD0SignOnMessage;
     }
     adapter.log.debug(`SmartmeterObis options: ${  JSON.stringify(smOptions)}`);
 
-    smTransport = SmartmeterObis.init(smOptions, storeObisData);
-
-    // Optional delay (seconds) to give a previous instance time to release the connection
+    // Optional delay (seconds): SmartmeterObis.init() already opens the connection, so delay it as a whole
     const startDelay = Math.max(parseInt(adapter.config.startDelay, 10) || 0, 0) * 1000;
+    if (startDelay > 0) {
+        adapter.log.info(`Waiting ${startDelay / 1000}s before opening the connection`);
+    }
     startTimer = setTimeout(() => {
         startTimer = null;
-        if (!stopInProgress) {
-smTransport.process();
-}
+        if (stopInProgress) {
+            return;
+        }
+        smTransport = SmartmeterObis.init(smOptions, storeObisData);
+        smTransport.process();
     }, startDelay);
 }
 
