@@ -15,7 +15,6 @@ const fs = require('fs');
 const utils = require('@iobroker/adapter-core'); // Get common adapter utils
 const SmartmeterObis = require('smartmeter-obis');
 let smTransport;
-let recoveryTimer = null;
 let startTimer = null;
 const { SerialPort } = require('serialport');
 
@@ -376,37 +375,12 @@ smOptions.protocolD0SignOnMessage = adapter.config.protocolD0SignOnMessage;
 
     smTransport = SmartmeterObis.init(smOptions, storeObisData);
 
-    // Give a previous instance time to release the serial port to avoid mixed-up data
-    const startDelay = (adapter.config.transport === 'SerialRequestResponseTransport' || adapter.config.transport === 'SerialResponseTransport') ? 10000 : 0;
-    armWatchdog();
+    // Optional delay (seconds) to give a previous instance time to release the connection
+    const startDelay = Math.max(parseInt(adapter.config.startDelay, 10) || 0, 0) * 1000;
     startTimer = setTimeout(() => {
         startTimer = null;
-        if (!stopInProgress) {
-smTransport.process();
-}
+        if (!stopInProgress) smTransport.process();
     }, startDelay);
-}
-
-// The transport may hang after a broken message (e.g. serial port not reopened).
-// Restart the adapter if no valid data arrives within 3 request intervals.
-function armWatchdog() {
-    if (recoveryTimer) {
-clearTimeout(recoveryTimer);
-}
-    const waitMs = (Math.max(parseInt(adapter.config.requestInterval, 10) || 0, 10) * 3 + 60) * 1000;
-    recoveryTimer = setTimeout(() => {
-        recoveryTimer = null;
-        if (stopInProgress) {
-return;
-}
-        adapter.log.warn(`No valid data received for ${  Math.round(waitMs / 1000)  }s, restarting adapter`);
-        setConnected(false);
-        if (typeof adapter.terminate === 'function') {
-            adapter.terminate(156); // START_IMMEDIATELY_AFTER_STOP
-        } else {
-            process.exit(156);
-        }
-    }, waitMs);
 }
 
 async function storeObisData(err, obisResult) {
@@ -419,7 +393,6 @@ return;
         setConnected(false);
         return;
     }
-    armWatchdog();
     setConnected(true);
     let updateCount = 0;
     for (const obisId in obisResult) {

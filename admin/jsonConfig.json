@@ -319,6 +319,18 @@
       "max": 65535,
       "hidden": "data.transport !== 'TCPTransport'"
     },
+    "startDelay": {
+      "type": "number",
+      "label": "field_startDelay",
+      "help": "info_startDelay",
+      "sm": 12,
+      "md": 6,
+      "lg": 4,
+      "min": 0,
+      "max": 600,
+      "unit": "s",
+      "hidden": "data.transport !== 'TCPTransport'"
+    },
     "_protocol": {
       "type": "header",
       "text": "heading_ProtocolSpecificSettings",
