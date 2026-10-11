@@ -16,6 +16,7 @@ const utils = require('@iobroker/adapter-core'); // Get common adapter utils
 const SmartmeterObis = require('smartmeter-obis');
 let smTransport;
 let startTimer = null;
+let recoveryTimer = null;
 let hadError = false;
 const stateTypes = {};
 const { SerialPort } = require('serialport');
@@ -182,12 +183,13 @@ function startAdapter(options) {
 
     adapter.on('unload', callback => {
         stopInProgress = true;
-        if (recoveryTimer) {
-clearTimeout(recoveryTimer);
-}
         if (startTimer) {
-clearTimeout(startTimer);
-}
+            clearTimeout(startTimer);
+        }
+        if (recoveryTimer) {
+            clearTimeout(recoveryTimer);
+            recoveryTimer = null;
+        }
         setConnected(false);
         if (smTransport) {
             smTransport.stop(callback);
@@ -381,7 +383,9 @@ smOptions.protocolD0SignOnMessage = adapter.config.protocolD0SignOnMessage;
     const startDelay = Math.max(parseInt(adapter.config.startDelay, 10) || 0, 0) * 1000;
     startTimer = setTimeout(() => {
         startTimer = null;
-        if (!stopInProgress) smTransport.process();
+        if (!stopInProgress) {
+smTransport.process();
+}
     }, startDelay);
 }
 
@@ -418,7 +422,27 @@ return;
         adapter.log.debug(err);
         setConnected(false);
         hadError = true;
+        // the transport sometimes does not recover after an error -> restart adapter if no valid data arrives again
+        if (!recoveryTimer) {
+            const waitMs = Math.max(60, (parseInt(adapter.config.requestInterval, 10) || 0) * 3) * 1000;
+            recoveryTimer = setTimeout(() => {
+                recoveryTimer = null;
+                if (stopInProgress) {
+                    return;
+                }
+                adapter.log.warn('No valid data received after error, restarting adapter');
+                if (typeof adapter.restart === 'function') {
+                    adapter.restart();
+                } else {
+                    adapter.terminate(156); // START_IMMEDIATELY_AFTER_STOP
+                }
+            }, waitMs);
+        }
         return;
+    }
+    if (recoveryTimer) {
+        clearTimeout(recoveryTimer);
+        recoveryTimer = null;
     }
     if (hadError) {
         hadError = false;
