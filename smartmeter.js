@@ -15,6 +15,7 @@ const fs = require('fs');
 const utils = require('@iobroker/adapter-core'); // Get common adapter utils
 const SmartmeterObis = require('smartmeter-obis');
 let smTransport;
+let recoveryTimer = null;
 const { SerialPort } = require('serialport');
 
 const smValues = {};
@@ -179,6 +180,7 @@ function startAdapter(options) {
 
     adapter.on('unload', callback => {
         stopInProgress = true;
+        if (recoveryTimer) clearTimeout(recoveryTimer);
         setConnected(false);
         if (smTransport) {
             smTransport.stop(callback);
@@ -367,7 +369,21 @@ async function storeObisData(err, obisResult) {
         adapter.log.warn(err.message);
         adapter.log.debug(err);
         setConnected(false);
+        // the transport sometimes does not recover after an error -> restart adapter if no valid data arrives again
+        if (!recoveryTimer) {
+            const waitMs = Math.max(60, (parseInt(adapter.config.requestInterval, 10) || 0) * 3) * 1000;
+            recoveryTimer = setTimeout(() => {
+                recoveryTimer = null;
+                if (stopInProgress) return;
+                adapter.log.warn('No valid data received after error, restarting adapter');
+                adapter.restart();
+            }, waitMs);
+        }
         return;
+    }
+    if (recoveryTimer) {
+        clearTimeout(recoveryTimer);
+        recoveryTimer = null;
     }
     setConnected(true);
     let updateCount = 0;
