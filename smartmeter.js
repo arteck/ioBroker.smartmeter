@@ -16,6 +16,7 @@ const utils = require('@iobroker/adapter-core'); // Get common adapter utils
 const SmartmeterObis = require('smartmeter-obis');
 let smTransport;
 let startTimer = null;
+let hadError = false;
 const { SerialPort } = require('serialport');
 
 const smValues = {};
@@ -391,7 +392,12 @@ return;
         adapter.log.warn(err.message);
         adapter.log.debug(err);
         setConnected(false);
+        hadError = true;
         return;
+    }
+    if (hadError) {
+        hadError = false;
+        adapter.log.info('Connection recovered, valid data received again');
     }
     setConnected(true);
     let updateCount = 0;
